@@ -1,4 +1,6 @@
 import frappe
+from frappe.rate_limiter import rate_limit
+from clefincode_chat.utils import secure_login
 import datetime
 import json
 import mimetypes
@@ -69,41 +71,16 @@ def get_clean_timezone(user_timezone):
 ######################################## Users Accounts #####################################
 #############################################################################################
 @frappe.whitelist(allow_guest = True)
-def login(email , password): 
-    user = frappe.db.get("User", {"email": email}) 
-    if user:
-        if not user.enabled:          
-            return [{"status":0,"description":"User Account is disabled","data":None}]
-        result =(
-            frappe.qb.from_(Auth)
-            .select(Auth.name, Auth.password)
-            .where(
-                (Auth.doctype == "User")
-                & (Auth.name == user.email)
-                & (Auth.fieldname == "password")
-                & (Auth.encrypted == 0)
-            )
-            .limit(1)
-            .run(as_dict=True)
-        )
+@rate_limit(limit=secure_login.ATTEMPTS, seconds=secure_login.WINDOW)
+def login(email , password):
+    # Password checks, lockout, rate limit and key reuse: clefincode_chat/utils/secure_login.py
+    name = secure_login.authenticate(email, password)
+    if not name:
+        return secure_login.failure()
+    api_key, api_secret, full_name = secure_login.api_keys(name)
+    frappe.db.commit()
+    return [{'status':1,"description":"Done successfully","data":[{"api_key":api_key,"api_secret":api_secret,'full_name':full_name}]}]
 
-        if not result or not passlibctx.verify(password, result[0].password):
-            return [{"status":0,"description":"Incorrect email or password","data":None}]
-            
-        else:
-            user = frappe.get_doc('User' , email)
-            api_secret = frappe.generate_hash(length=15)
-            # if api key is not set generate api key
-            if not user.api_key:
-                api_key = frappe.generate_hash(length=15)
-                user.api_key = api_key
-            user.api_secret = api_secret
-            user.save(ignore_permissions=True)
-            frappe.db.commit()               
-            return [{'status':1,"description":"Done successfully","data":[{"api_key":user.api_key,"api_secret":api_secret,'full_name':user.full_name}]}]
-            
-    else:    
-        return [{"status":0,"description":"User doesn't exist","data":None}]
 # ==========================================================================================
 @frappe.whitelist()
 def get_versions():   

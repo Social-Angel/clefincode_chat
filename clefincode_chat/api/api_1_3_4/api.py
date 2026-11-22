@@ -3,6 +3,8 @@ import re
 import string
 import traceback
 import frappe, shutil, os
+from frappe.rate_limiter import rate_limit
+from clefincode_chat.utils import secure_login
 import datetime
 import json
 import mimetypes
@@ -106,47 +108,21 @@ def get_clean_timezone(user_timezone):
 #############################################################################################
 
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=secure_login.ATTEMPTS, seconds=secure_login.WINDOW)
 def login(email=None, password=None):
-    if not email or not password:
-        return [{
-            "status": 0,
-            "description": "Email and password are required",
-            "data": None
-        }]
+    # Password checks, lockout and rate limit: clefincode_chat/utils/secure_login.py
+    name = secure_login.authenticate(email, password)
+    if not name:
+        return secure_login.failure()
 
-    user = frappe.db.get_value(
-        "User",
-        {"email": email},
-        ["name", "email", "enabled", "full_name", "user_image"],
-        as_dict=True
-    )
-
-    if not user:
-        return [{
-            "status": 0,
-            "description": "User doesn't exist",
-            "data": None
-        }]
-
-    if not user.enabled:
-        return [{
-            "status": 0,
-            "description": "User Account is disabled",
-            "data": None
-        }]
-
+    user = frappe.db.get_value("User", name, ["name", "email", "full_name", "user_image"], as_dict=True)
     try:
         lm = LoginManager()
-        lm.authenticate(user=user.name, pwd=password)
+        lm.user = name
         lm.post_login()
-
     except Exception:
         frappe.log_error(frappe.get_traceback(), "login_failure")
-        return [{
-            "status": 0,
-            "description": "Incorrect email or password",
-            "data": None
-        }]
+        return secure_login.failure()
 
     sid = getattr(frappe.session, "sid", None)
 
