@@ -9,7 +9,8 @@
  "field_order": [
   "base_url",
   "access_token",
-  "webhook_verify_token"
+  "webhook_verify_token",
+  "app_secret"
  ],
  "fields": [
   {
@@ -26,6 +27,12 @@
    "mandatory_depends_on": "eval:doc.enable == 1"
   },
   {
+   "fieldname": "app_secret",
+   "fieldtype": "Password",
+   "label": "Meta App Secret",
+   "description": "Meta for Developers > your app > App settings > Basic > App secret. Incoming messages are accepted only when Meta's signature matches it; without it they are refused."
+  },
+  {
    "fieldname": "base_url",
    "fieldtype": "Data",
    "hidden": 1,
@@ -35,7 +42,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-10-12 13:56:55.255092",
+ "modified": "2026-11-22 21:00:00.000000",
  "modified_by": "Administrator",
  "module": "ClefinCode Chat",
  "name": "ClefinCode WhatsApp Integration",

@@ -18,6 +18,7 @@ from clefincode_chat.api.api_1_3_4.api import create_group, get_profile_id, send
 import urllib.parse
 from frappe.utils.password import get_decrypted_password
 from requests.auth import HTTPBasicAuth
+from clefincode_chat.utils import webhook_security
 
 from twilio.twiml.messaging_response import MessagingResponse
 import traceback
@@ -26,6 +27,9 @@ import traceback
 def handle():
     if frappe.request.method == "GET":
         return verify_token_and_fulfill_challenge()
+    # Only Meta may deliver messages here (utils/webhook_security.py).
+    if not webhook_security.meta_signature_ok("ClefinCode WhatsApp Integration"):
+        return webhook_security.refused()
 
     try:
         form_dict = frappe.local.form_dict
@@ -344,9 +348,7 @@ def create_direct_channel(chat_profile, receiver_user_email, whatsapp_profile_do
 
 def verify_token_and_fulfill_challenge():
     meta_challenge = frappe.form_dict.get("hub.challenge")
-    expected_token = frappe.db.get_single_value("ClefinCode WhatsApp Integration", "webhook_verify_token")
-
-    if frappe.form_dict.get("hub.verify_token") != expected_token:
+    if not webhook_security.verify_token_ok("ClefinCode WhatsApp Integration"):
         frappe.throw("Verify token does not match")
 
     return Response(meta_challenge, status=200)
@@ -523,6 +525,9 @@ def instagram_handle():
     """Handles Instagram webhook data."""
     if frappe.request.method == "GET":
         return instagram_webhook_handle()
+    # Only Meta may deliver messages here (utils/webhook_security.py).
+    if not webhook_security.meta_signature_ok("ClefinCode Instagram Integration"):
+        return webhook_security.refused()
         
 
     try:
@@ -830,9 +835,7 @@ def create_instagram_direct_channel(chat_profile, receiver_user_email, instagram
 def instagram_webhook_handle():
     """Handles the initial webhook verification."""
     meta_challenge = frappe.form_dict.get("hub.challenge")
-    expected_token = frappe.db.get_single_value("ClefinCode Instagram Integration", "webhook_verify_token")
-
-    if frappe.form_dict.get("hub.verify_token") != expected_token:
+    if not webhook_security.verify_token_ok("ClefinCode Instagram Integration"):
         frappe.throw("Verify token does not match")
 
     return Response(meta_challenge, status=200)      
@@ -876,6 +879,9 @@ def messenger_handle():
     """Handles Messenger webhook data."""
     if frappe.request.method == "GET":
         return messenger_webhook_handle()
+    # Only Meta may deliver messages here (utils/webhook_security.py).
+    if not webhook_security.meta_signature_ok("ClefinCode Facebook Messenger Integration"):
+        return webhook_security.refused()
 
     try:
         form_dict = frappe.local.form_dict
@@ -1186,9 +1192,7 @@ def create_messenger_direct_channel(chat_profile, receiver_user_email, messenger
 def messenger_webhook_handle():
     """Handles the initial webhook verification."""
     meta_challenge = frappe.form_dict.get("hub.challenge")
-    expected_token = frappe.db.get_single_value("ClefinCode Facebook Messenger Integration", "webhook_verify_token")
-
-    if frappe.form_dict.get("hub.verify_token") != expected_token:
+    if not webhook_security.verify_token_ok("ClefinCode Facebook Messenger Integration"):
         frappe.throw("Verify token does not match")
 
     return Response(meta_challenge, status=200)       
