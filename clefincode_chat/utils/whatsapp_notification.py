@@ -24,9 +24,16 @@ def run_server_script_for_doc_event(doc, event):
     if frappe.flags.in_install or frappe.flags.in_migrate or frappe.flags.in_uninstall:
         return
 
-    _ensure_patch()
+    # This runs on every event of every document on the site. Read the notification map from the
+    # cache (it was rebuilt with a query on every call), and stop at once when no ClefinCode
+    # Notification is set up for this doctype, which is the case for almost every save.
+    all_maps = _cached_notifications_map()
+    if any(m.get("Value Change") for m in all_maps.values()):
+        _ensure_patch()  # only needed when some notification watches value changes
 
-    notifications_map = get_notifications_map().get(doc.doctype, {})
+    notifications_map = all_maps.get(doc.doctype, {})
+    if not notifications_map:
+        return
 
     frappe.logger().debug(
         f"[WhatsApp Notification] Event={event}, DocType={doc.doctype}, Name={doc.name}"
@@ -187,12 +194,30 @@ def trigger_whatsapp_notifications(event):
 def capture_old_snapshot(doc, method=None):
     if doc.is_new():
         return
+    # Loading the saved copy doubles the cost of every save; only do it when a notification needs it.
+    if not _cached_notifications_map().get(doc.doctype):
+        return
 
     try:
         old_doc = frappe.get_doc(doc.doctype, doc.name)
         doc._old_snapshot = old_doc.as_dict()
     except Exception:
         frappe.log_error(frappe.get_traceback(), "Value Change Snapshot Error")
+
+
+_NOTIFICATIONS_MAP_KEY = "whatsapp_notification_map"
+
+
+def _cached_notifications_map():
+    """get_notifications_map() from the cache; rebuilt when a ClefinCode Notification changes."""
+    cached = frappe.cache().get_value(_NOTIFICATIONS_MAP_KEY)
+    if cached is None:
+        cached = get_notifications_map()
+    return cached or {}
+
+
+def clear_notifications_map(doc=None, method=None):
+    frappe.cache().delete_value(_NOTIFICATIONS_MAP_KEY)
 
 
 # ---------------------------------------------------------------------------
@@ -211,7 +236,7 @@ def _patch_db_set_value_for_value_change():
 
         fields = list(values_dict.keys())
 
-        notifications_map = get_notifications_map() or {}
+        notifications_map = _cached_notifications_map() or {}
         doctype_map = notifications_map.get(doctype, {})
 
         vc_notifications = doctype_map.get("Value Change", [])

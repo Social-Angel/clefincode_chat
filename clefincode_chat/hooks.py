@@ -156,6 +156,11 @@ doc_events = {
     "Customer": {
         "on_trash": "clefincode_chat.utils.deleted_accounts.on_party_trash",
     },
+    # The every-document hooks below read a cached map of ClefinCode Notifications; rebuild it on change.
+    "Clefincode Notification": {
+        "on_update": "clefincode_chat.utils.whatsapp_notification.clear_notifications_map",
+        "on_trash": "clefincode_chat.utils.whatsapp_notification.clear_notifications_map",
+    },
     "Notification Log": {
     "after_insert": [
         "clefincode_chat.api.api_1_3_1.api.after_insert_notification"
