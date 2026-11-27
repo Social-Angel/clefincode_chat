@@ -19,7 +19,8 @@ def initialize_firebase():
             firebase_admin.initialize_app(cred)
 
 #====================================================================================================================
-@frappe.whitelist(allow_guest = True)
+# Not callable over the web (SocialAngel, 27 Nov 2026): anyone, without logging in, could send a
+# push notification with any title and text to a device token. Only the server's own code calls it.
 def send_notification_via_firebase(registration_token, info, realtime_type, platform = None ,title = None, body = None, same_user = None ,message_type = None):
     initialize_firebase()    
     message=None
@@ -101,7 +102,8 @@ def send_notification_via_firebase(registration_token, info, realtime_type, plat
             except Exception as e:
                 frappe.log_error("Android Error in sending notifications",f"Android Error in sending notifications: {str(e)}")
 # ==================================================================================
-@frappe.whitelist(allow_guest = True)
+# Not callable over the web (SocialAngel, 27 Nov 2026): anyone, without logging in, could send a
+# push notification with any title and text to a device token. Only the server's own code calls it.
 def send_notification_log_via_firebase(registration_token,platform = None , body = None,title = 'Notification from system'):
     initialize_firebase()    
     message=None 
